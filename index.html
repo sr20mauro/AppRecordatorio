@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestor de Recordatorios Elegante</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+    
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    /* Transiciones suaves */
+    .task-card {
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .task-card:hover {
+      transform: translateY(-2px);
+    }
+
+    /* Animación check */
+    .checkbox-custom {
+      transition: all 0.2s ease-in-out;
+    }
+    
+    /* Scrollbar personalizada */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(241, 245, 249, 0.8);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- APP HEADER -->
+  <header class="bg-white/80 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        
+        <!-- Saludo y Fecha -->
+        <div class="flex items-center gap-3">
+          <div class="p-2.5 bg-gradient-to-tr from-indigo-600 to-violet-500 text-white rounded-2xl shadow-md shadow-indigo-200">
+            <i data-lucide="check-square" class="w-7 h-7"></i>
+          </div>
+          <div>
+            <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+              <span>Mis Recordatorios</span>
+            </h1>
+            <p id="current-date" class="text-xs sm:text-sm font-medium text-slate-500 capitalize">Cargando fecha...</p>
+          </div>
+        </div>
+
+        <!-- Estadísticas Rápidas -->
+        <div class="flex items-center gap-2 bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/60 self-start sm:self-auto">
+          <div class="px-3 py-1.5 rounded-xl bg-white shadow-xs text-center min-w-[70px]">
+            <span class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Total</span>
+            <span id="stat-total" class="text-base font-extrabold text-slate-800">0</span>
+          </div>
+          <div class="px-3 py-1.5 rounded-xl bg-amber-500/10 text-center min-w-[70px]">
+            <span class="block text-xs font-semibold text-amber-600 uppercase tracking-wider">Pendientes</span>
+            <span id="stat-pending" class="text-base font-extrabold text-amber-600">0</span>
+          </div>
+          <div class="px-3 py-1.5 rounded-xl bg-emerald-500/10 text-center min-w-[70px]">
+            <span class="block text-xs font-semibold text-emerald-600 uppercase tracking-wider">Listos</span>
+            <span id="stat-completed" class="text-base font-extrabold text-emerald-600">0</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- CONTENIDO PRINCIPAL -->
+  <main class="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 flex-1 w-full space-y-6">
+
+    <!-- BARRA DE ACCIÓN: BUSCADOR Y BOTÓN NUEVO -->
+    <div class="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+      
+      <!-- Búsqueda en tiempo real -->
+      <div class="relative flex-1">
+        <i data-lucide="search" class="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+        <input 
+          type="text" 
+          id="search-input"
+          placeholder="Buscar recordatorio por título o notas..." 
+          class="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-xs transition-all"
+        >
+        <button id="clear-search" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Botón Agregar Nuevo Recordatorio -->
+      <button 
+        id="btn-open-modal"
+        class="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-semibold text-sm rounded-xl shadow-md shadow-indigo-200 transition-all hover:shadow-lg hover:shadow-indigo-300 transform active:scale-95"
+      >
+        <i data-lucide="plus-circle" class="w-5 h-5"></i>
+        <span>Nuevo Recordatorio</span>
+      </button>
+    </div>
+
+    <!-- PESTAÑAS Y FILTROS -->
+    <div class="space-y-3">
+      
+      <!-- Filtros por tiempo/estado -->
+      <div class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar border-b border-slate-200">
+        <button data-filter="all" class="tab-btn active-tab px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-2">
+          <i data-lucide="layers" class="w-4 h-4"></i> Todos
+        </button>
+        <button data-filter="today" class="tab-btn inactive-tab px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-2">
+          <i data-lucide="calendar-days" class="w-4 h-4"></i> Hoy
+        </button>
+        <button data-filter="upcoming" class="tab-btn inactive-tab px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-2">
+          <i data-lucide="clock" class="w-4 h-4"></i> Próximos
+        </button>
+        <button data-filter="completed" class="tab-btn inactive-tab px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-2">
+          <i data-lucide="check-circle-2" class="w-4 h-4"></i> Completados
+        </button>
+        <button data-filter="starred" class="tab-btn inactive-tab px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-2">
+          <i data-lucide="star" class="w-4 h-4"></i> Destacados
+        </button>
+      </div>
+
+      <!-- Filtros secundarios (Prioridad / Categoría) -->
+      <div class="flex flex-wrap items-center justify-between gap-3 text-xs">
+        
+        <!-- Prioridad -->
+        <div class="flex items-center gap-1.5">
+          <span class="font-medium text-slate-400 mr-1">Prioridad:</span>
+          <button data-priority="all" class="priority-chip active-chip px-2.5 py-1 rounded-lg font-medium">Todas</button>
+          <button data-priority="alta" class="priority-chip inactive-chip px-2.5 py-1 rounded-lg font-medium text-red-600">🔴 Alta</button>
+          <button data-priority="media" class="priority-chip inactive-chip px-2.5 py-1 rounded-lg font-medium text-amber-600">🟡 Media</button>
+          <button data-priority="baja" class="priority-chip inactive-chip px-2.5 py-1 rounded-lg font-medium text-emerald-600">🟢 Baja</button>
+        </div>
+
+        <!-- Categorías Selector -->
+        <div class="flex items-center gap-2">
+          <label for="category-filter" class="font-medium text-slate-400">Categoría:</label>
+          <select id="category-filter" class="bg-white border border-slate-200 text-slate-700 rounded-lg px-2.5 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500">
+            <option value="all">Todas las categorías</option>
+            <option value="Trabajo">💼 Trabajo</option>
+            <option value="Personal">👤 Personal</option>
+            <option value="Salud">🏥 Salud</option>
+            <option value="Finanzas">💰 Finanzas</option>
+          </select>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- CONTENEDOR DE LISTA DE RECORDATORIOS -->
+    <div id="reminders-container" class="space-y-3 min-h-[250px]">
+      <!-- Se llenará dinámicamente con JavaScript -->
+    </div>
+
+    <!-- ESTADO VACÍO (EMPTY STATE) -->
+    <div id="empty-state" class="hidden flex-col items-center justify-center py-12 px-4 text-center bg-white rounded-2xl border border-dashed border-slate-300/80 shadow-xs">
+      <div class="w-16 h-16 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center mb-4 shadow-inner">
+        <i data-lucide="sparkles" class="w-8 h-8"></i>
+      </div>
+      <h3 class="text-base font-bold text-slate-800 mb-1">¡No hay recordatorios aquí!</h3>
+      <p id="empty-state-msg" class="text-xs sm:text-sm text-slate-500 max-w-sm">No tienes tareas pendientes que coincidan con los filtros seleccionados.</p>
+      <button id="btn-empty-add" class="mt-4 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-semibold text-xs rounded-xl transition-all">
+        + Crear un nuevo recordatorio
+      </button>
+    </div>
+
+  </main>
+
+  <!-- MODAL DE AGREGAR / EDITAR RECORDATORIO -->
+  <div id="modal-backdrop" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200">
+    <div id="modal-container" class="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-lg w-full p-6 transform scale-95 transition-all duration-200 space-y-5">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2">
+          <div class="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+            <i data-lucide="edit-3" class="w-5 h-5"></i>
+          </div>
+          <h3 id="modal-title" class="text-lg font-bold text-slate-900">Nuevo Recordatorio</h3>
+        </div>
+        <button id="btn-close-modal" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Modal Form -->
+      <form id="reminder-form" class="space-y-4">
+        <input type="hidden" id="reminder-id">
+
+        <!-- Título -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Título *</label>
+          <input 
+            type="text" 
+            id="form-title" 
+            required 
+            placeholder="Ej. Pagar la factura de luz o Consulta médica"
+            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+          >
+        </div>
+
+        <!-- Categoría y Prioridad -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Categoría</label>
+            <select id="form-category" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="Trabajo">💼 Trabajo</option>
+              <option value="Personal">👤 Personal</option>
+              <option value="Salud">🏥 Salud</option>
+              <option value="Finanzas">💰 Finanzas</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Prioridad</label>
+            <select id="form-priority" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="baja">🟢 Baja</option>
+              <option value="media" selected>🟡 Media</option>
+              <option value="alta">🔴 Alta</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Fecha y Hora -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Fecha</label>
+            <input 
+              type="date" 
+              id="form-date" 
+              required
+              class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Hora</label>
+            <input 
+              type="time" 
+              id="form-time" 
+              required
+              class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+          </div>
+        </div>
+
+        <!-- Notas adicionales -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Notas / Detalles</label>
+          <textarea 
+            id="form-notes" 
+            rows="3" 
+            placeholder="Añade instrucciones, links o detalles extra..."
+            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+          ></textarea>
+        </div>
+
+        <!-- Acciones del Modal -->
+        <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+          <button 
+            type="button" 
+            id="btn-cancel-modal"
+            class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition-all"
+          >
+            Cancelar
+          </button>
+          <button 
+            type="submit" 
+            class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl shadow-md shadow-indigo-200 transition-all"
+          >
+            Guardar Recordatorio
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    // --- DATOS DE EJEMPLO INICIALES ---
+    const DEFAULT_REMINDERS = [
+      {
+        id: "1",
+        title: "Reunión de planificación semanal",
+        category: "Trabajo",
+        priority: "alta",
+        date: new Date().toISOString().split('T')[0],
+        time: "10:00",
+        notes: "Revisar los objetivos del trimestre y asignar tareas al equipo.",
+        completed: false,
+        starred: true
+      },
+      {
+        id: "2",
+        title: "Ir al supermercado e insumos",
+        category: "Personal",
+        priority: "media",
+        date: new Date().toISOString().split('T')[0],
+        time: "18:30",
+        notes: "Comprar frutas, verduras frescas y café.",
+        completed: false,
+        starred: false
+      },
+      {
+        id: "3",
+        title: "Control médico anual",
+        category: "Salud",
+        priority: "alta",
+        date: getFutureDateStr(3),
+        time: "11:15",
+        notes: "Llevar exámenes de laboratorio anteriores.",
+        completed: false,
+        starred: false
+      },
+      {
+        id: "4",
+        title: "Pagar servicio de Internet",
+        category: "Finanzas",
+        priority: "baja",
+        date: getFutureDateStr(1),
+        time: "09:00",
+        notes: "Descargar la factura digital antes de transferir.",
+        completed: true,
+        starred: false
+      }
+    ];
+
+    function getFutureDateStr(daysAhead) {
+      const d = new Date();
+      d.setDate(d.getDate() + daysAhead);
+      return d.toISOString().split('T')[0];
+    }
+
+    // --- ESTADO GLOBAL ---
+    let reminders = [];
+    let activeFilter = 'all';       // all, today, upcoming, completed, starred
+    let activePriority = 'all';     // all, alta, media, baja
+    let activeCategory = 'all';     // all, Trabajo, Personal, Salud, Finanzas
+    let searchQuery = '';
+
+    // --- ELEMENTOS DOM ---
+    const container = document.getElementById('reminders-container');
+    const emptyState = document.getElementById('empty-state');
+    const emptyStateMsg = document.getElementById('empty-state-msg');
+    const currentDateEl = document.getElementById('current-date');
+    const searchInput = document.getElementById('search-input');
+    const clearSearchBtn = document.getElementById('clear-search');
+    
+    // Stats
+    const statTotal = document.getElementById('stat-total');
+    const statPending = document.getElementById('stat-pending');
+    const statCompleted = document.getElementById('stat-completed');
+
+    // Modal & Form
+    const modalBackdrop = document.getElementById('modal-backdrop');
+    const modalTitle = document.getElementById('modal-title');
+    const reminderForm = document.getElementById('reminder-form');
+    const inputId = document.getElementById('reminder-id');
+    const inputTitle = document.getElementById('form-title');
+    const inputCategory = document.getElementById('form-category');
+    const inputPriority = document.getElementById('form-priority');
+    const inputDate = document.getElementById('form-date');
+    const inputTime = document.getElementById('form-time');
+    const inputNotes = document.getElementById('form-notes');
+
+    // --- INICIALIZACIÓN ---
+    window.addEventListener('DOMContentLoaded', () => {
+      loadReminders();
+      setupDateHeader();
+      render();
+      setupEventListeners();
+    });
+
+    // --- MANEJO DE STORAGE ---
+    function loadReminders() {
+      const stored = localStorage.getItem('app_reminders');
+      if (stored) {
+        try {
+          reminders = JSON.parse(stored);
+        } catch (e) {
+          reminders = DEFAULT_REMINDERS;
+        }
+      } else {
+        reminders = DEFAULT_REMINDERS;
+        saveReminders();
+      }
+    }
+
+    function saveReminders() {
+      localStorage.setItem('app_reminders', JSON.stringify(reminders));
+    }
+
+    // --- ENCABEZADO Y FECHA ---
+    function setupDateHeader() {
+      const now = new Date();
+      const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      currentDateEl.textContent = now.toLocaleDateString('es-ES', options);
+    }
+
+    // --- LÓGICA DE FILTRADO ---
+    function getFilteredReminders() {
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      return reminders.filter(item => {
+        // 1. Filtro por búsqueda
+        if (searchQuery.trim() !== '') {
+          const q = searchQuery.toLowerCase();
+          const matchTitle = item.title.toLowerCase().includes(q);
+          const matchNotes = item.notes ? item.notes.toLowerCase().includes(q) : false;
+          if (!matchTitle && !matchNotes) return false;
+        }
+
+        // 2. Filtro por Pestaña
+        if (activeFilter === 'today' && item.date !== todayStr) return false;
+        if (activeFilter === 'upcoming' && (item.date <= todayStr || item.completed)) return false;
+        if (activeFilter === 'completed' && !item.completed) return false;
+        if (activeFilter === 'starred' && !item.starred) return false;
+
+        // 3. Filtro por Prioridad
+        if (activePriority !== 'all' && item.priority !== activePriority) return false;
+
+        // 4. Filtro por Categoría
+        if (activeCategory !== 'all' && item.category !== activeCategory) return false;
+
+        return true;
+      });
+    }
+
+    // --- RENDERIZADO PRINCIPAL ---
+    function render() {
+      updateStats();
+      const filtered = getFilteredReminders();
+
+      container.innerHTML = '';
+
+      if (filtered.length === 0) {
+        emptyState.classList.remove('hidden');
+        emptyState.classList.add('flex');
+        
+        if (searchQuery) {
+          emptyStateMsg.textContent = `No se encontraron resultados para "${searchQuery}".`;
+        } else {
+          emptyStateMsg.textContent = "No tienes recordatorios en esta vista.";
+        }
+      } else {
+        emptyState.classList.add('hidden');
+        emptyState.classList.remove('flex');
+
+        filtered.forEach(item => {
+          container.appendChild(createReminderCard(item));
+        });
+      }
+
+      // Reiniciar iconos de Lucide
+      lucide.createIcons();
+    }
+
+    function updateStats() {
+      const total = reminders.length;
+      const completed = reminders.filter(r => r.completed).length;
+      const pending = total - completed;
+
+      statTotal.textContent = total;
+      statPending.textContent = pending;
+      statCompleted.textContent = completed;
+    }
+
+    // --- CONSTRUCCIÓN DE LA TARJETA (CARD) ---
+    function createReminderCard(item) {
+      const card = document.createElement('div');
+      
+      // Colores por prioridad
+      const priorityColors = {
+        alta: { border: 'border-l-red-500', badge: 'bg-red-50 text-red-700 border-red-200', label: 'Alta' },
+        media: { border: 'border-l-amber-500', badge: 'bg-amber-50 text-amber-700 border-amber-200', label: 'Media' },
+        baja: { border: 'border-l-emerald-500', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'Baja' }
+      };
+
+      const pInfo = priorityColors[item.priority] || priorityColors.media;
+
+      // Colores por categoría
+      const categoryBadges = {
+        Trabajo: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+        Personal: 'bg-purple-50 text-purple-700 border-purple-100',
+        Salud: 'bg-teal-50 text-teal-700 border-teal-100',
+        Finanzas: 'bg-blue-50 text-blue-700 border-blue-100'
+      };
+
+      const catStyle = categoryBadges[item.category] || 'bg-slate-100 text-slate-700';
+
+      // Formatear fecha
+      const formattedDate = formatDateDisplay(item.date);
+
+      card.className = `task-card bg-white rounded-2xl p-4 shadow-xs border border-slate-200/80 border-l-4 ${pInfo.border} ${item.completed ? 'opacity-65 bg-slate-50/70' : ''} flex flex-col sm:flex-row sm:items-center justify-between gap-3`;
+
+      card.innerHTML = `
+        <div class="flex items-start gap-3.5 flex-1 min-w-0">
+          
+          <!-- Checkbox redondo interactivo -->
+          <button 
+            onclick="toggleComplete('${item.id}')"
+            class="checkbox-custom mt-0.5 w-6 h-6 rounded-full border-2 ${item.completed ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 hover:border-indigo-500 bg-white'} flex items-center justify-center shrink-0"
+            title="${item.completed ? 'Marcar como pendiente' : 'Marcar como completado'}"
+          >
+            ${item.completed ? '<i data-lucide="check" class="w-4 h-4 stroke-[3]"></i>' : ''}
+          </button>
+
+          <!-- Detalles del recordatorio -->
+          <div class="space-y-1 flex-1 min-w-0">
+            
+            <div class="flex flex-wrap items-center gap-2">
+              <h4 class="text-sm sm:text-base font-semibold ${item.completed ? 'line-through text-slate-400' : 'text-slate-800'} break-words">
+                ${escapeHtml(item.title)}
+              </h4>
+            </div>
+
+            <!-- Notas si existen -->
+            ${item.notes ? `<p class="text-xs text-slate-500 line-clamp-2 ${item.completed ? 'text-slate-400' : ''}">${escapeHtml(item.notes)}</p>` : ''}
+
+            <!-- Badges e información de tiempo -->
+            <div class="flex flex-wrap items-center gap-2 pt-1 text-xs">
+              
+              <!-- Badge Categoría -->
+              <span class="px-2 py-0.5 rounded-md font-semibold border ${catStyle}">
+                ${item.category}
+              </span>
+
+              <!-- Badge Prioridad -->
+              <span class="px-2 py-0.5 rounded-md font-medium border ${pInfo.badge}">
+                Prioridad ${pInfo.label}
+              </span>
+
+              <span class="text-slate-300">•</span>
+
+              <!-- Fecha y Hora -->
+              <div class="flex items-center gap-1.5 font-medium text-slate-500">
+                <i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-400"></i>
+                <span>${formattedDate}</span>
+                <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400 ml-1"></i>
+                <span>${item.time}</span>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="flex items-center justify-end gap-1 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100 shrink-0">
+          
+          <!-- Destacar / Estrellita -->
+          <button 
+            onclick="toggleStar('${item.id}')"
+            class="p-2 rounded-xl text-slate-400 hover:text-amber-500 hover:bg-amber-50 transition-colors"
+            title="${item.starred ? 'Quitar destacado' : 'Destacar'}"
+          >
+            <i data-lucide="star" class="w-4 h-4 ${item.starred ? 'fill-amber-400 text-amber-400' : ''}"></i>
+          </button>
+
+          <!-- Editar -->
+          <button 
+            onclick="openEditModal('${item.id}')"
+            class="p-2 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+            title="Editar"
+          >
+            <i data-lucide="pencil" class="w-4 h-4"></i>
+          </button>
+
+          <!-- Eliminar -->
+          <button 
+            onclick="deleteReminder('${item.id}')"
+            class="p-2 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+            title="Eliminar"
+          >
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+
+        </div>
+      `;
+
+      return card;
+    }
+
+    // --- ACCIONES SOBRE RECORDATORIOS ---
+    function toggleComplete(id) {
+      reminders = reminders.map(r => r.id === id ? { ...r, completed: !r.completed } : r);
+      saveReminders();
+      render();
+    }
+
+    function toggleStar(id) {
+      reminders = reminders.map(r => r.id === id ? { ...r, starred: !r.starred } : r);
+      saveReminders();
+      render();
+    }
+
+    function deleteReminder(id) {
+      if (confirm('¿Estás seguro de que deseas eliminar este recordatorio?')) {
+        reminders = reminders.filter(r => r.id !== id);
+        saveReminders();
+        render();
+        showToast('Recordatorio eliminado');
+      }
+    }
+
+    // --- EVENT LISTENERS ---
+    function setupEventListeners() {
+      // Modal Open/Close
+      document.getElementById('btn-open-modal').addEventListener('click', () => openModal());
+      document.getElementById('btn-empty-add').addEventListener('click', () => openModal());
+      document.getElementById('btn-close-modal').addEventListener('click', closeModal);
+      document.getElementById('btn-cancel-modal').addEventListener('click', closeModal);
+
+      // Submit Formulario
+      reminderForm.addEventListener('submit', handleFormSubmit);
+
+      // Búsqueda
+      searchInput.addEventListener('input', (e) => {
+        searchQuery = e.target.value;
+        clearSearchBtn.classList.toggle('hidden', searchQuery === '');
+        render();
+      });
+
+      clearSearchBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        searchQuery = '';
+        clearSearchBtn.classList.add('hidden');
+        render();
+      });
+
+      // Pestañas principales
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          document.querySelectorAll('.tab-btn').forEach(b => {
+            b.classList.remove('active-tab', 'bg-indigo-600', 'text-white', 'shadow-xs');
+            b.classList.add('inactive-tab', 'text-slate-600', 'hover:bg-slate-200/60');
+          });
+
+          const target = e.currentTarget;
+          target.classList.add('active-tab', 'bg-indigo-600', 'text-white', 'shadow-xs');
+          target.classList.remove('inactive-tab', 'text-slate-600', 'hover:bg-slate-200/60');
+
+          activeFilter = target.getAttribute('data-filter');
+          render();
+        });
+      });
+
+      // Chips de prioridad
+      document.querySelectorAll('.priority-chip').forEach(chip => {
+        chip.addEventListener('click', (e) => {
+          document.querySelectorAll('.priority-chip').forEach(c => {
+            c.classList.remove('active-chip', 'bg-slate-800', 'text-white');
+            c.classList.add('inactive-chip', 'bg-slate-100', 'hover:bg-slate-200');
+          });
+
+          const target = e.currentTarget;
+          target.classList.add('active-chip', 'bg-slate-800', 'text-white');
+          target.classList.remove('inactive-chip', 'bg-slate-100');
+
+          activePriority = target.getAttribute('data-priority');
+          render();
+        });
+      });
+
+      // Selector de categoría
+      document.getElementById('category-filter').addEventListener('change', (e) => {
+        activeCategory = e.target.value;
+        render();
+      });
+    }
+
+    // --- MODAL Y FORMULARIO ---
+    function openModal(item = null) {
+      if (item) {
+        modalTitle.textContent = "Editar Recordatorio";
+        inputId.value = item.id;
+        inputTitle.value = item.title;
+        inputCategory.value = item.category;
+        inputPriority.value = item.priority;
+        inputDate.value = item.date;
+        inputTime.value = item.time;
+        inputNotes.value = item.notes || '';
+      } else {
+        modalTitle.textContent = "Nuevo Recordatorio";
+        reminderForm.reset();
+        inputId.value = '';
+        inputDate.value = new Date().toISOString().split('T')[0];
+        inputTime.value = "12:00";
+      }
+
+      modalBackdrop.classList.remove('opacity-0', 'pointer-events-none');
+      modalBackdrop.querySelector('#modal-container').classList.remove('scale-95');
+      modalBackdrop.querySelector('#modal-container').classList.add('scale-100');
+    }
+
+    function closeModal() {
+      modalBackdrop.classList.add('opacity-0', 'pointer-events-none');
+      modalBackdrop.querySelector('#modal-container').classList.remove('scale-100');
+      modalBackdrop.querySelector('#modal-container').classList.add('scale-95');
+    }
+
+    function openEditModal(id) {
+      const item = reminders.find(r => r.id === id);
+      if (item) openModal(item);
+    }
+
+    function handleFormSubmit(e) {
+      e.preventDefault();
+
+      const id = inputId.value;
+      const newItem = {
+        id: id || Date.now().toString(),
+        title: inputTitle.value.trim(),
+        category: inputCategory.value,
+        priority: inputPriority.value,
+        date: inputDate.value,
+        time: inputTime.value,
+        notes: inputNotes.value.trim(),
+        completed: id ? (reminders.find(r => r.id === id)?.completed || false) : false,
+        starred: id ? (reminders.find(r => r.id === id)?.starred || false) : false
+      };
+
+      if (id) {
+        reminders = reminders.map(r => r.id === id ? newItem : r);
+        showToast('Recordatorio actualizado');
+      } else {
+        reminders.unshift(newItem);
+        showToast('Recordatorio creado');
+      }
+
+      saveReminders();
+      closeModal();
+      render();
+    }
+
+    // --- UTILIDADES ---
+    function formatDateDisplay(dateStr) {
+      if (!dateStr) return '';
+      const today = new Date().toISOString().split('T')[0];
+      const tomorrow = getFutureDateStr(1);
+
+      if (dateStr === today) return 'Hoy';
+      if (dateStr === tomorrow) return 'Mañana';
+
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+      return dateStr;
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      return text.replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+    }
+
+    function showToast(message) {
+      const toastContainer = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'bg-slate-900 text-white text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 transform translate-y-2 opacity-0 transition-all duration-200 pointer-events-auto';
+      toast.innerHTML = `<i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i> ${message}`;
+      
+      toastContainer.appendChild(toast);
+      lucide.createIcons();
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      }, 10);
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 200);
+      }, 2500);
+    }
+  </script>
+
+  <!-- ESTILOS ADICIONALES PARA ESTADOS ACTIVOS DE PESTAÑAS -->
+  <style>
+    .tab-btn.active-tab {
+      background-color: #4f46e5;
+      color: #ffffff;
+      box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    }
+    .tab-btn.inactive-tab {
+      color: #475569;
+    }
+    .tab-btn.inactive-tab:hover {
+      background-color: #f1f5f9;
+    }
+
+    .priority-chip.active-chip {
+      background-color: #1e293b;
+      color: #ffffff;
+    }
+    .priority-chip.inactive-chip {
+      background-color: #f1f5f9;
+    }
+    .priority-chip.inactive-chip:hover {
+      background-color: #e2e8f0;
+    }
+  </style>
+</body>
+</html>
+```
